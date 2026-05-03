@@ -299,13 +299,18 @@ jobs:
       if: inputs.add_le9uo
       working-directory: ${{ env.KERNEL_ROOT }}/common
       run: |
-        LE9UO_COMMIT="67ce3c2da64654764740765bf882b321b586eb9f"
-        LE9UO_BASE="https://raw.githubusercontent.com/firelzrd/le9uo/${LE9UO_COMMIT}/le9uo_patches/stable/base"
-        PATCH_FILE="0001-linux6.6.63-le9uo-1.14.patch"
+        LE9UO_COMMIT="a795bb7936596bb7ce4fbbf9b30840e74931706d"
+        LE9UO_BASE="https://raw.githubusercontent.com/firelzrd/le9uo/${LE9UO_COMMIT}/le9uo_patches/stable"
+        PATCH_FILE="0001-linux6.6.44-le9uo-1.6.patch"
         curl -LSsf -o /tmp/le9uo.patch "${LE9UO_BASE}/${PATCH_FILE}" || {
           echo "::warning::Failed to download LE9UO patch, skipping"
           exit 0
         }
+        if ! patch -p1 --dry-run -F3 --no-backup-if-mismatch < /tmp/le9uo.patch; then
+          echo "::warning::LE9UO patch does not apply cleanly, skipping"
+          rm -f /tmp/le9uo.patch
+          exit 0
+        fi
         patch -p1 -F3 --no-backup-if-mismatch < /tmp/le9uo.patch
         echo "Applied ${PATCH_FILE} (pinned at ${LE9UO_COMMIT::8})"
         rm -f /tmp/le9uo.patch
