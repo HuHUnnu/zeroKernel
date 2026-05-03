@@ -299,16 +299,16 @@ jobs:
       if: inputs.add_le9uo
       working-directory: ${{ env.KERNEL_ROOT }}/common
       run: |
-        LE9UO_DIR="$(mktemp -d)"
-        git clone --depth=1 https://github.com/firelzrd/le9uo.git "$LE9UO_DIR"
-        PATCH=$(find "$LE9UO_DIR/le9uo_patches" -name "linux6.6-le9uo-*.patch" | sort -V | tail -1)
-        if [ -z "$PATCH" ]; then
-          echo "::warning::No LE9UO patch found for kernel 6.6, skipping"
-        else
-          patch -p1 -F3 --no-backup-if-mismatch < "$PATCH"
-          echo "Applied $(basename "$PATCH")"
-        fi
-        rm -rf "$LE9UO_DIR"
+        LE9UO_COMMIT="67ce3c2da64654764740765bf882b321b586eb9f"
+        LE9UO_BASE="https://raw.githubusercontent.com/firelzrd/le9uo/${LE9UO_COMMIT}/le9uo_patches/stable/base"
+        PATCH_FILE="0001-linux6.6.63-le9uo-1.14.patch"
+        curl -LSsf -o /tmp/le9uo.patch "${LE9UO_BASE}/${PATCH_FILE}" || {
+          echo "::warning::Failed to download LE9UO patch, skipping"
+          exit 0
+        }
+        patch -p1 -F3 --no-backup-if-mismatch < /tmp/le9uo.patch
+        echo "Applied ${PATCH_FILE} (pinned at ${LE9UO_COMMIT::8})"
+        rm -f /tmp/le9uo.patch
 
     - name: Apply Kernel Patches
       if: inputs.add_ptrace_fix || inputs.add_perf_patches
@@ -498,7 +498,10 @@ jobs:
             echo 'override KBUILD_HOSTLDFLAGS += --sysroot=/' >> common/tools/bpf/resolve_btfids/Makefile
             echo 'override LDFLAGS += --sysroot=/' >> common/tools/bpf/resolve_btfids/Makefile
           fi
-          tools/bazel build --config=fast --lto=$LTO_MODE --defconfig_fragment=//common:arch/arm64/configs/sukisu_gki.fragment //common:kernel_aarch64_dist || BUILD_RC=$?
+          tools/bazel build --config=fast --lto=$LTO_MODE \
+            --//build/kernel/kleaf:kmi_symbol_list_strict_mode=false \
+            --defconfig_fragment=//common:arch/arm64/configs/sukisu_gki.fragment \
+            //common:kernel_aarch64_dist || BUILD_RC=$?
         fi
         if [ "$BUILD_RC" -ne 0 ]; then
           if find . -name "Image" -type f 2>/dev/null | grep -q .; then
@@ -522,6 +525,8 @@ jobs:
         done
 
     - name: Prepare AnyKernel3
+      env:
+        INPUT_CODENAME: ${{ inputs.device_codename }}
       run: |
         if [ -f "$KERNEL_ROOT/out/${ANDROID_VER}-${KERNEL_VER}/dist/Image" ]; then
           cp "$KERNEL_ROOT/out/${ANDROID_VER}-${KERNEL_VER}/dist/Image" "$ANYKERNEL3/Image"
@@ -531,6 +536,20 @@ jobs:
           echo "FATAL: Image not found"
           find "$KERNEL_ROOT" -name "Image" -type f 2>/dev/null
           exit 1
+        fi
+
+        PROFILE_FILE="$GITHUB_WORKSPACE/device-profiles.json"
+        if [ -n "$INPUT_CODENAME" ] && [ "$INPUT_CODENAME" != "generic" ] && [ -f "$PROFILE_FILE" ]; then
+          DEVICE_NAME=$(jq -r ".devices.${INPUT_CODENAME}.name // empty" "$PROFILE_FILE")
+          KERNEL_LABEL="zeroKernel ${KERNEL_VER}.${SUBLEVEL} | ${DEVICE_NAME:-$INPUT_CODENAME}"
+        else
+          KERNEL_LABEL="zeroKernel ${KERNEL_VER}.${SUBLEVEL}"
+        fi
+
+        AK_SH="$ANYKERNEL3/anykernel.sh"
+        if [ -f "$AK_SH" ]; then
+          sed -i "s|^kernel.string=.*|kernel.string=${KERNEL_LABEL}|" "$AK_SH"
+          echo "AnyKernel3 branded: ${KERNEL_LABEL}"
         fi
 
     - name: Scan Patch Rejects

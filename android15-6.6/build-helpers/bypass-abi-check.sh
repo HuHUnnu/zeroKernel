@@ -21,6 +21,11 @@ fi
 
 sed -i 's/check_defconfig//' ./common/build.config.gki 2>/dev/null || true
 
+# Kleaf: disable KMI symbol list strict mode in BUILD.bazel
+if [[ -f "common/BUILD.bazel" ]]; then
+  sed -i 's/"kmi_symbol_list_strict_mode": True/"kmi_symbol_list_strict_mode": False/g' common/BUILD.bazel
+fi
+
 # Kleaf: disable savedefconfig check in the build macro
 if [[ -f "build/kernel/kleaf/common_kernels.bzl" ]]; then
   sed -i 's/"match" if pre_defconfig_fragments else "minimized"/"disabled"/' build/kernel/kleaf/common_kernels.bzl
