@@ -1,0 +1,63 @@
+name: "zeroKernel - TB322FC"
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      sub_level:
+        description: "Kernel sublevel"
+        type: choice
+        options:
+          - "56"
+          - "118"
+        default: "56"
+      os_patch_level:
+        description: "OS patch level (must match sublevel)"
+        type: choice
+        options:
+          - "2024-11"
+          - "2026-01"
+        default: "2024-11"
+      add_zeromount:
+        description: "Add ZeroMount (VFS-level mountless injection)"
+        type: boolean
+        default: true
+      add_bbg:
+        description: "Add Baseband Guard"
+        type: boolean
+        default: true
+      add_kpm:
+        description: "Add KPM (Kernel Patch Module)"
+        type: boolean
+        default: true
+      sukisu_commit:
+        description: "SukiSU commit override (empty = pinned)"
+        type: string
+        default: ""
+
+jobs:
+  download-dependencies:
+    uses: ./.github/workflows/cache-dependencies.yml
+    permissions:
+      contents: read
+      actions: write
+
+  build:
+    needs: [download-dependencies]
+    uses: ./.github/workflows/build-sukisu.yml
+    with:
+      android_version: android15
+      kernel_version: "6.6"
+      sub_level: ${{ inputs.sub_level }}
+      os_patch_level: ${{ inputs.os_patch_level }}
+      add_susfs: true
+      add_zeromount: ${{ inputs.add_zeromount }}
+      add_zram: true
+      add_bbg: ${{ inputs.add_bbg }}
+      add_overlayfs_support: true
+      add_kpm: ${{ inputs.add_kpm }}
+      sukisu_commit: ${{ inputs.sukisu_commit }}
+      device_codename: tb322fc

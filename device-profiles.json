@@ -29,6 +29,21 @@
         "build_host": "build-host",
         "compiler_info": "Android (11368308, +pgo, +bolt, +lto, +mlgo, based on r510928) clang version 18.0.0"
       }
+    },
+    "tb322fc": {
+      "name": "Lenovo Tab TB322FC",
+      "codename": "tb322fc",
+      "android_version": "android15",
+      "kernel_version": "6.6",
+      "sub_level": "56",
+      "os_patch_level": "2024-11",
+      "stock_kernel": {
+        "release": "-android15-8-g38447e018c92-ab12829524-4k",
+        "version_string": "#1 SMP PREEMPT Thu Dec 19 17:58:46 UTC 2024",
+        "build_user": "kleaf",
+        "build_host": "build-host",
+        "compiler_info": "Android (11368308, +pgo, +bolt, +lto, +mlgo, based on r510928) clang version 18.0.0"
+      }
     }
   },
   "_template": {
