@@ -281,50 +281,53 @@ jobs:
     - name: Fix Manual Hook Compatibility
       if: inputs.add_manual_hooks
       working-directory: ${{ env.KERNEL_ROOT }}/common
-      env:
-        KSU_DIR: ${{ env.KSU_DIR }}
       run: |
-        KSU_SRC="$KERNEL_ROOT/$KSU_DIR"
         READWRITE="fs/read_write.c"
+        echo "=== Before fix ==="
+        grep -n 'ksu_handle_sys_read\|CONFIG_KSU_MANUAL_HOOK\|CONFIG_KSU_SUSFS' "$READWRITE" || true
 
-        echo "=== Before fix: all ksu_handle_sys_read refs ==="
-        grep -n 'ksu_handle_sys_read' "$READWRITE" || true
+        # When SUSFS is also enabled, its patch (50_add_susfs_in_gki) already adds
+        # the correct ksu_handle_sys_read hook to read_write.c:
+        #   extern void ksu_handle_sys_read(unsigned int fd);  [single-param, void]
+        # The manual hook v1.6 patch adds a CONFLICTING version:
+        #   extern int ksu_handle_sys_read(unsigned int fd, char __user **buf_ptr, size_t *count_ptr);
+        # Both compile (CONFIG_KSU_SUSFS=y and CONFIG_KSU_MANUAL_HOOK=y), causing
+        # "conflicting types for 'ksu_handle_sys_read'".
+        #
+        # Fix: remove the v1.6 patch's read_write.c additions entirely.
+        # The SUSFS hook already covers this with the correct signature.
+        # Other files (exec.c, open.c, stat.c, input.c, reboot.c) are unaffected —
+        # they either use different function names or have compatible signatures.
 
-        # Strategy: detect duplicate extern declarations in the file itself.
-        # The v1.6 patch adds:   extern int ksu_handle_sys_read(unsigned int fd, char __user **buf_ptr, size_t *count_ptr);
-        # SukiSU-Ultra already has: extern __attribute__((cold)) void ksu_handle_sys_read(unsigned int fd);
-        # These conflict — remove the patch's version and fix the call site.
-        EXTERN_COUNT=$(grep -c 'extern.*ksu_handle_sys_read' "$READWRITE" || echo 0)
-        echo "Extern declaration count: $EXTERN_COUNT"
+        SUSFS_HOOK=$(grep -c 'CONFIG_KSU_SUSFS' "$READWRITE" || echo 0)
+        MANUAL_HOOK=$(grep -c 'CONFIG_KSU_MANUAL_HOOK' "$READWRITE" || echo 0)
 
-        if [ "$EXTERN_COUNT" -gt 1 ]; then
-          echo "Duplicate declarations found — removing patch's 3-param extern"
-          sed -i '/extern int ksu_handle_sys_read.*char __user/d' "$READWRITE"
-          sed -i '/^[[:space:]]*size_t.*count_ptr);/d' "$READWRITE"
-          echo "Removed conflicting extern lines"
-        fi
-
-        # Fix call site: check remaining extern to determine param count
-        REMAINING=$(grep 'extern.*ksu_handle_sys_read' "$READWRITE" | head -1 || true)
-        echo "Remaining extern: $REMAINING"
-        if echo "$REMAINING" | grep -q 'unsigned int fd)'; then
-          echo "Single-param signature confirmed — fixing call site"
-          sed -i 's/ksu_handle_sys_read(fd, &buf, &count)/ksu_handle_sys_read(fd)/' "$READWRITE"
-          echo "Fixed call site to single-param"
-        fi
-
-        # Handle ksu_vfs_read_hook -> ksu_init_rc_hook rename
-        if grep -rq 'ksu_init_rc_hook' "$KSU_SRC" --include='*.c' --include='*.h' && \
-           ! grep -rq 'ksu_vfs_read_hook' "$KSU_SRC" --include='*.c' --include='*.h'; then
-          echo "Fixing: ksu_vfs_read_hook -> ksu_init_rc_hook"
-          sed -i 's/ksu_vfs_read_hook/ksu_init_rc_hook/g' "$READWRITE"
-          echo "Fixed variable name"
+        if [ "$SUSFS_HOOK" -gt 0 ] && [ "$MANUAL_HOOK" -gt 0 ]; then
+          echo "Both SUSFS and manual hook blocks found — removing v1.6's conflicting version"
+          python3 << 'PYEOF'
+        import re
+        with open("fs/read_write.c") as f:
+            content = f.read()
+        original = content
+        # Remove all #if CONFIG_KSU_MANUAL_HOOK ... #endif blocks
+        content = re.sub(
+            r'#if\s+defined\(CONFIG_KSU\)\s*&&\s*defined\(CONFIG_KSU_MANUAL_HOOK\)\s*\n'
+            r'(?:.*\n)*?'
+            r'#endif\s*\n',
+            '',
+            content
+        )
+        removed = original.count('CONFIG_KSU_MANUAL_HOOK') - content.count('CONFIG_KSU_MANUAL_HOOK')
+        with open("fs/read_write.c", "w") as f:
+            f.write(content)
+        print(f"Removed {removed} CONFIG_KSU_MANUAL_HOOK references from read_write.c")
+        PYEOF
+        else
+          echo "No SUSFS/manual-hook conflict in read_write.c (SUSFS=$SUSFS_HOOK, manual=$MANUAL_HOOK)"
         fi
 
         echo "=== After fix ==="
-        grep -n 'ksu_handle_sys_read' "$READWRITE" || true
-        echo "--- Full hook section ---"
-        grep -n -A5 -B2 'CONFIG_KSU_MANUAL_HOOK' "$READWRITE" | head -30
+        grep -n 'ksu_handle_sys_read\|CONFIG_KSU_MANUAL_HOOK' "$READWRITE" || echo "(clean — no manual hook refs remain)"
 
     - name: Apply LE9UO Memory Protection Patch
       if: inputs.add_le9uo
