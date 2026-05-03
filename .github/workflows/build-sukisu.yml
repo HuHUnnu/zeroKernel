@@ -287,30 +287,44 @@ jobs:
         KSU_SRC="$KERNEL_ROOT/$KSU_DIR"
         READWRITE="fs/read_write.c"
 
-        # Detect actual ksu_handle_sys_read signature in SukiSU-Ultra source
-        ACTUAL_SIG=$(grep -rn 'int ksu_handle_sys_read' "$KSU_SRC" --include='*.c' --include='*.h' | head -1 || true)
-        echo "SukiSU-Ultra sys_read signature: $ACTUAL_SIG"
+        echo "=== Before fix: all ksu_handle_sys_read refs ==="
+        grep -n 'ksu_handle_sys_read' "$READWRITE" || true
 
-        if echo "$ACTUAL_SIG" | grep -q 'unsigned int fd)'; then
-          echo "Fixing: SukiSU-Ultra uses single-param ksu_handle_sys_read(fd)"
-          # Replace 3-param extern with 1-param
-          sed -i 's/extern int ksu_handle_sys_read(unsigned int fd, char __user \*\*buf_ptr,/extern int ksu_handle_sys_read(unsigned int fd);/' "$READWRITE"
-          sed -i '/\s*size_t \*count_ptr);/d' "$READWRITE"
-          # Replace 3-arg call with 1-arg call
-          sed -i 's/ksu_handle_sys_read(fd, \&buf, \&count)/ksu_handle_sys_read(fd)/' "$READWRITE"
-          echo "Fixed ksu_handle_sys_read to single-param"
+        # Strategy: detect duplicate extern declarations in the file itself.
+        # The v1.6 patch adds:   extern int ksu_handle_sys_read(unsigned int fd, char __user **buf_ptr, size_t *count_ptr);
+        # SukiSU-Ultra already has: extern __attribute__((cold)) void ksu_handle_sys_read(unsigned int fd);
+        # These conflict — remove the patch's version and fix the call site.
+        EXTERN_COUNT=$(grep -c 'extern.*ksu_handle_sys_read' "$READWRITE" || echo 0)
+        echo "Extern declaration count: $EXTERN_COUNT"
+
+        if [ "$EXTERN_COUNT" -gt 1 ]; then
+          echo "Duplicate declarations found — removing patch's 3-param extern"
+          sed -i '/extern int ksu_handle_sys_read.*char __user/d' "$READWRITE"
+          sed -i '/^[[:space:]]*size_t.*count_ptr);/d' "$READWRITE"
+          echo "Removed conflicting extern lines"
         fi
 
-        # Detect if ksu_vfs_read_hook was renamed to ksu_init_rc_hook
+        # Fix call site: check remaining extern to determine param count
+        REMAINING=$(grep 'extern.*ksu_handle_sys_read' "$READWRITE" | head -1 || true)
+        echo "Remaining extern: $REMAINING"
+        if echo "$REMAINING" | grep -q 'unsigned int fd)'; then
+          echo "Single-param signature confirmed — fixing call site"
+          sed -i 's/ksu_handle_sys_read(fd, &buf, &count)/ksu_handle_sys_read(fd)/' "$READWRITE"
+          echo "Fixed call site to single-param"
+        fi
+
+        # Handle ksu_vfs_read_hook -> ksu_init_rc_hook rename
         if grep -rq 'ksu_init_rc_hook' "$KSU_SRC" --include='*.c' --include='*.h' && \
            ! grep -rq 'ksu_vfs_read_hook' "$KSU_SRC" --include='*.c' --include='*.h'; then
-          echo "Fixing: ksu_vfs_read_hook renamed to ksu_init_rc_hook"
+          echo "Fixing: ksu_vfs_read_hook -> ksu_init_rc_hook"
           sed -i 's/ksu_vfs_read_hook/ksu_init_rc_hook/g' "$READWRITE"
           echo "Fixed variable name"
         fi
 
-        echo "--- Patched $READWRITE hook section ---"
-        grep -A5 -B2 'CONFIG_KSU_MANUAL_HOOK' "$READWRITE" | head -20
+        echo "=== After fix ==="
+        grep -n 'ksu_handle_sys_read' "$READWRITE" || true
+        echo "--- Full hook section ---"
+        grep -n -A5 -B2 'CONFIG_KSU_MANUAL_HOOK' "$READWRITE" | head -30
 
     - name: Apply LE9UO Memory Protection Patch
       if: inputs.add_le9uo
