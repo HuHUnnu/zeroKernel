@@ -64,15 +64,15 @@ CONFIG_TMPFS_XATTR=y
 CONFIG_TMPFS_POSIX_ACL=y
 
 # [performance]
-# Disable kernel debug features if enabled in base MTK config.
-# These are NOT in gki_defconfig — may be set by vendor config.
-# Check /proc/config.gz on device before uncommenting.
-# CONFIG_DEBUG_MUTEXES is not set                    # [CHECK DEVICE FIRST]
-# CONFIG_DEBUG_SPINLOCK is not set                   # [CHECK DEVICE FIRST]
-# CONFIG_DEBUG_ATOMIC_SLEEP is not set               # [CHECK DEVICE FIRST]
-# CONFIG_PROVE_LOCKING is not set                    # [CHECK DEVICE FIRST]
-# CONFIG_LOCKDEP is not set                          # [CHECK DEVICE FIRST]
-# CONFIG_DEBUG_LOCK_ALLOC is not set                 # [CHECK DEVICE FIRST]
+CONFIG_SCHED_DEBUG=n
+CONFIG_SCHEDSTATS=n
+CONFIG_HZ_250=n
+CONFIG_HZ_300=y
+CONFIG_SCHED_AUTOGROUP=y
+
+# [manual_hook]
+CONFIG_KSU_MANUAL_HOOK=y
+CONFIG_KSU_SUSFS_SUS_SU=n
 
 # [kpm]
 CONFIG_KPM=y

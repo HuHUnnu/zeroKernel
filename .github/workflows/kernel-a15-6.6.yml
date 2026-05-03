@@ -42,6 +42,18 @@ on:
         description: "Add KPM (SukiSU/ReSukiSU)"
         type: boolean
         default: true
+      add_manual_hooks:
+        description: "Manual syscall hooks (kprobe-free, max stealth)"
+        type: boolean
+        default: false
+      add_perf_tuning:
+        description: "Performance tuning (300Hz, debug-off, autogroup)"
+        type: boolean
+        default: false
+      add_le9uo:
+        description: "LE9UO memory protection (anti-thrash)"
+        type: boolean
+        default: false
       sukisu_commit:
         description: "SukiSU commit (empty = pinned default)"
         type: string
@@ -77,6 +89,15 @@ on:
       add_kpm:
         type: boolean
         default: true
+      add_manual_hooks:
+        type: boolean
+        default: false
+      add_perf_tuning:
+        type: boolean
+        default: false
+      add_le9uo:
+        type: boolean
+        default: false
       sukisu_commit:
         type: string
         default: ""
@@ -144,6 +165,9 @@ jobs:
       add_bbg: ${{ inputs.add_bbg }}
       add_overlayfs_support: ${{ inputs.add_overlayfs_support }}
       add_kpm: ${{ inputs.add_kpm }}
+      add_manual_hooks: ${{ inputs.add_manual_hooks }}
+      add_perf_tuning: ${{ inputs.add_perf_tuning }}
+      add_le9uo: ${{ inputs.add_le9uo }}
       sukisu_commit: ${{ inputs.sukisu_commit }}
       device_codename: ${{ inputs.device_codename }}
 

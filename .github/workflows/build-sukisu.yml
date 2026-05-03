@@ -37,6 +37,15 @@ on:
       add_kpm:
         type: boolean
         default: false
+      add_manual_hooks:
+        type: boolean
+        default: false
+      add_perf_tuning:
+        type: boolean
+        default: false
+      add_le9uo:
+        type: boolean
+        default: false
       add_ptrace_fix:
         type: boolean
         default: true
@@ -100,7 +109,6 @@ jobs:
         path: kernel_patches
 
     - name: Download SukiSU Patch
-      if: inputs.add_zram
       uses: actions/download-artifact@v8
       with:
         name: sukisu-patch
@@ -234,6 +242,33 @@ jobs:
         FIX="$GITHUB_WORKSPACE/$VERSION_DIR/build-helpers/fix-susfs-compat.sh"
         [ -f "$FIX" ] && bash "$FIX" . "$SUBLEVEL" "$ANDROID_VER" "$KERNEL_VER" "$KERNEL_PATCHES" || true
 
+    - name: Apply Manual Hook Patch
+      if: inputs.add_manual_hooks
+      working-directory: ${{ env.KERNEL_ROOT }}/common
+      run: |
+        PATCH="$GITHUB_WORKSPACE/SukiSU_patch/hooks/scope_min_manual_hooks_v1.6.patch"
+        if [ ! -f "$PATCH" ]; then
+          echo "::error::Manual hook patch not found: $PATCH"
+          exit 1
+        fi
+        patch -p1 -F3 --no-backup-if-mismatch < "$PATCH"
+        echo "Applied scope_min_manual_hooks_v1.6.patch"
+
+    - name: Apply LE9UO Memory Protection Patch
+      if: inputs.add_le9uo
+      working-directory: ${{ env.KERNEL_ROOT }}/common
+      run: |
+        LE9UO_DIR="$(mktemp -d)"
+        git clone --depth=1 https://github.com/firelzrd/le9uo.git "$LE9UO_DIR"
+        PATCH=$(find "$LE9UO_DIR/le9uo_patches" -name "linux6.6-le9uo-*.patch" | sort -V | tail -1)
+        if [ -z "$PATCH" ]; then
+          echo "::warning::No LE9UO patch found for kernel 6.6, skipping"
+        else
+          patch -p1 -F3 --no-backup-if-mismatch < "$PATCH"
+          echo "Applied $(basename "$PATCH")"
+        fi
+        rm -rf "$LE9UO_DIR"
+
     - name: Apply Kernel Patches
       if: inputs.add_ptrace_fix || inputs.add_perf_patches
       working-directory: ${{ env.KERNEL_ROOT }}/common
@@ -283,6 +318,8 @@ jobs:
         ADD_OVERLAYFS: ${{ inputs.add_overlayfs_support }}
         ADD_ZRAM: ${{ inputs.add_zram }}
         ADD_KPM: ${{ inputs.add_kpm }}
+        ADD_MANUAL_HOOKS: ${{ inputs.add_manual_hooks }}
+        ADD_PERF_TUNING: ${{ inputs.add_perf_tuning }}
       run: |
         FRAGMENT="$GITHUB_WORKSPACE/$VERSION_DIR/defconfig.fragment"
         HELPERS="$GITHUB_WORKSPACE/$VERSION_DIR/build-helpers"
@@ -292,6 +329,8 @@ jobs:
         [[ "$ADD_OVERLAYFS" == "true" ]] && ASSEMBLE_FLAGS="$ASSEMBLE_FLAGS --overlayfs"
         [[ "$ADD_ZRAM" == "true" ]] && ASSEMBLE_FLAGS="$ASSEMBLE_FLAGS --zram"
         [[ "$ADD_KPM" == "true" ]] && ASSEMBLE_FLAGS="$ASSEMBLE_FLAGS --kpm"
+        [[ "$ADD_MANUAL_HOOKS" == "true" ]] && ASSEMBLE_FLAGS="$ASSEMBLE_FLAGS --manual-hook"
+        [[ "$ADD_PERF_TUNING" == "true" ]] && ASSEMBLE_FLAGS="$ASSEMBLE_FLAGS --perf-tuning"
         [ ! -f "$KERNEL_ROOT/build/build.sh" ] && ASSEMBLE_FLAGS="$ASSEMBLE_FLAGS --kleaf"
 
         bash "$HELPERS/assemble-defconfig.sh" "$FRAGMENT" "$DEFCONFIG_FRAGMENT" "$DEFCONFIG" $ASSEMBLE_FLAGS
@@ -494,6 +533,9 @@ jobs:
         ADD_BBG: ${{ inputs.add_bbg }}
         ADD_OVERLAYFS: ${{ inputs.add_overlayfs_support }}
         ADD_KPM: ${{ inputs.add_kpm }}
+        ADD_MANUAL_HOOKS: ${{ inputs.add_manual_hooks }}
+        ADD_PERF_TUNING: ${{ inputs.add_perf_tuning }}
+        ADD_LE9UO: ${{ inputs.add_le9uo }}
       run: |
         S() { [[ "$1" == "true" ]] && echo "Enabled" || echo "Disabled"; }
         {
@@ -506,6 +548,9 @@ jobs:
           echo "| **OS Patch Level** | ${OS_PATCH} |"
           echo "| **Enhanced SUSFS** | $(S "$ADD_SUSFS") |"
           echo "| **ZeroMount** | $(S "$ADD_ZEROMOUNT") |"
+          echo "| **Manual Hooks (v1.6)** | $(S "$ADD_MANUAL_HOOKS") |"
+          echo "| **Perf Tuning (300Hz/debug-off)** | $(S "$ADD_PERF_TUNING") |"
+          echo "| **LE9UO (memory protection)** | $(S "$ADD_LE9UO") |"
           echo "| **ZRAM (LZ4K/LZ4KD)** | $(S "$ADD_ZRAM") |"
           echo "| **LZ4 v1.10.0** | $(S "$ADD_ZRAM") |"
           echo "| **Overlayfs Support** | $(S "$ADD_OVERLAYFS") |"

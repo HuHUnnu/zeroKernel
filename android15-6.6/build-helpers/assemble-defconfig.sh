@@ -10,6 +10,8 @@ ADD_SUSFS=false
 ADD_OVERLAYFS=false
 ADD_ZRAM=false
 ADD_KPM=false
+ADD_MANUAL_HOOK=false
+ADD_PERF_TUNING=false
 USE_KLEAF=false
 
 for arg in "$@"; do
@@ -18,6 +20,8 @@ for arg in "$@"; do
     --overlayfs) ADD_OVERLAYFS=true ;;
     --zram) ADD_ZRAM=true ;;
     --kpm) ADD_KPM=true ;;
+    --manual-hook) ADD_MANUAL_HOOK=true ;;
+    --perf-tuning) ADD_PERF_TUNING=true ;;
     --kleaf) USE_KLEAF=true ;;
   esac
 done
@@ -30,6 +34,8 @@ extract_section "base" >> "$FRAGMENT_DST"
 $ADD_SUSFS && extract_section "susfs" >> "$FRAGMENT_DST"
 $ADD_OVERLAYFS && extract_section "overlayfs" >> "$FRAGMENT_DST"
 $ADD_ZRAM && extract_section "zram" >> "$FRAGMENT_DST"
+$ADD_MANUAL_HOOK && extract_section "manual_hook" >> "$FRAGMENT_DST"
+$ADD_PERF_TUNING && extract_section "performance" >> "$FRAGMENT_DST"
 $ADD_KPM && extract_section "kpm" >> "$FRAGMENT_DST"
 
 # dedup fragment: last-wins per CONFIG_ key

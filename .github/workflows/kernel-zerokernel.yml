@@ -1,4 +1,4 @@
-name: "zeroKernel - TB322FC"
+name: "zeroKernel — TB322FC"
 
 permissions:
   contents: write
@@ -15,26 +15,50 @@ on:
           - "118"
         default: "56"
       os_patch_level:
-        description: "OS patch level (must match sublevel)"
+        description: "OS security patch level"
         type: choice
         options:
           - "2024-11"
           - "2026-01"
         default: "2024-11"
+      add_manual_hooks:
+        description: "Manual syscall hooks (kprobe-free, max stealth)"
+        type: boolean
+        default: true
+      add_susfs:
+        description: "Enhanced SUSFS (path/mount/kstat/map hiding)"
+        type: boolean
+        default: true
       add_zeromount:
-        description: "Add ZeroMount (VFS-level mountless injection)"
+        description: "ZeroMount (mountless module loading)"
+        type: boolean
+        default: true
+      add_zram:
+        description: "ZRAM with LZ4K/LZ4KD compression"
         type: boolean
         default: true
       add_bbg:
-        description: "Add Baseband Guard"
+        description: "Baseband Guard (modem protection)"
         type: boolean
         default: true
       add_kpm:
-        description: "Add KPM (Kernel Patch Module)"
+        description: "Kernel Patch Module support"
+        type: boolean
+        default: true
+      add_perf_tuning:
+        description: "Performance tuning (300Hz, debug-off, autogroup)"
+        type: boolean
+        default: true
+      add_le9uo:
+        description: "LE9UO memory protection (anti-thrash)"
+        type: boolean
+        default: true
+      add_overlayfs_support:
+        description: "Overlayfs (tmpfs xattr + POSIX ACL)"
         type: boolean
         default: true
       sukisu_commit:
-        description: "SukiSU commit override (empty = pinned)"
+        description: "Pin SukiSU commit (empty = latest pinned)"
         type: string
         default: ""
 
@@ -53,11 +77,14 @@ jobs:
       kernel_version: "6.6"
       sub_level: ${{ inputs.sub_level }}
       os_patch_level: ${{ inputs.os_patch_level }}
-      add_susfs: true
+      add_susfs: ${{ inputs.add_susfs }}
       add_zeromount: ${{ inputs.add_zeromount }}
-      add_zram: true
+      add_zram: ${{ inputs.add_zram }}
       add_bbg: ${{ inputs.add_bbg }}
-      add_overlayfs_support: true
+      add_overlayfs_support: ${{ inputs.add_overlayfs_support }}
       add_kpm: ${{ inputs.add_kpm }}
+      add_manual_hooks: ${{ inputs.add_manual_hooks }}
+      add_perf_tuning: ${{ inputs.add_perf_tuning }}
+      add_le9uo: ${{ inputs.add_le9uo }}
       sukisu_commit: ${{ inputs.sukisu_commit }}
       device_codename: tb322fc
