@@ -87,8 +87,26 @@ jobs:
         rmz_version: "3.1.1"
         testing: false
 
-    - name: Install LLD
-      run: sudo apt-get install -y -qq lld binutils
+    - name: Install LLD and ccache
+      run: sudo apt-get install -y -qq lld binutils ccache
+
+    - name: Restore ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-${{ github.run_number }}
+        restore-keys: |
+          ccache-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-
+          ccache-${{ inputs.android_version }}-${{ inputs.kernel_version }}-
+
+    - name: Configure ccache
+      run: |
+        ccache -M 4G
+        ccache --set-config=compiler_check=content
+        ccache --set-config=compression=true
+        ccache -z
+        echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
+        echo "PATH=/usr/lib/ccache:$PATH" >> "$GITHUB_ENV"
 
     - name: Download AnyKernel3 Artifact
       uses: actions/download-artifact@v8
@@ -141,6 +159,12 @@ jobs:
           echo "KERNEL_PATCHES=$GITHUB_WORKSPACE/kernel_patches"
           echo "ANYKERNEL3=$GITHUB_WORKSPACE/AnyKernel3"
         } >> "$GITHUB_ENV"
+
+    - name: Cache Repo Git Objects
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.KERNEL_ROOT }}/.repo
+        key: repo-${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}
 
     - name: Sync Kernel Source
       working-directory: ${{ env.KERNEL_ROOT }}
@@ -466,6 +490,10 @@ jobs:
             exit "$BUILD_RC"
           fi
         fi
+
+    - name: ccache Stats
+      if: always()
+      run: ccache -s
 
     - name: Dump Build Errors
       if: failure()
