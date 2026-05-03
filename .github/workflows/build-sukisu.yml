@@ -553,7 +553,7 @@ jobs:
 
         AK_SH="$ANYKERNEL3/anykernel.sh"
         if [ -f "$AK_SH" ]; then
-          sed -i "s|^kernel.string=.*|kernel.string=${KERNEL_LABEL}|" "$AK_SH"
+          sed -i "s#^kernel.string=.*#kernel.string=${KERNEL_LABEL}#" "$AK_SH"
           echo "AnyKernel3 branded: ${KERNEL_LABEL}"
         fi
 
